@@ -14,8 +14,8 @@ This documentation provides an overview of the **Web Service** and **RESTful API
 ## Table of Contents
 - [Overview](https://github.com/FS-30/03-BE-Eduliterate-Express.git#overview)
 - [Getting Started](https://github.com/FS-30/03-BE-Eduliterate-Express.git#getting-started)
-- [Authentication](https://github.com/FS-30/03-BE-Eduliterate-Express.git#authentication)
-- [Error Handling](https://github.com/FS-30/03-BE-Eduliterate-Express.git#error-handling)
+- [Project Structure](https://github.com/FS-30/03-BE-Eduliterate-Express.git#project-structure)
+- [API Endpoints](https://github.com/FS-30/03-BE-Eduliterate-Express.git#api-endpoints)
 - [Entity Relationship Diagram](https://github.com/FS-30/03-BE-Eduliterate-Express.git#erd)
 
 <br>
@@ -61,29 +61,47 @@ The server will be running on `http://localhost:3000`
 
 <br>
 
-### 3. Authentication <a name="authentication"></a>
-The API uses **JWT (JSON Web Token)** for user authentication. To access protected routes, include the token in the Authorization header of your requests.
-```
-Authorization: Bearer YOUR_JWT_TOKEN
-```
+### 3. Project Structure <a name="project-structure"></a>
+The project follows a modular structure:
+- ```index.js```: Entry point of the application, establishes server connection and defines middleware.
+- ```config/```: Contains database configuration.
+- ```middlewares/```: Holds authentication middleware for authorization checks.
+- ```models/```: Contains Mongoose models for users, books, and payments.
+- ```routes/```: Includes routes for authentication and data handling.
 
 <br>
 
-### 4. Error Handling <a name="error-handling"></a>
-The API provides standard HTTP status codes for responses. In case of an error, the response will include a JSON object with a message property describing the error.
-**Example:**
-```
-{
-  "message": "Unauthorized"
-}
-```
+### 4. API Endpoints <a name="api-endpoints"></a>
+**Authentication**
+- ```POST /auth/register```: Register a new user.
+- ```POST /auth/login```: Log in an existing user.
+
+<br>
+
+**Data Handling**<br>
+**a. Users**
+- ```POST /data/users```: Create a new user (admin-only).
+- ```GET /data/users```: Get all users (admin-only).
+- ```PUT /data/users/:id```: Update a user by ID (admin-only).
+- ```DELETE /data/users/:id```: Delete a user by ID (admin-only).
+
+**b. Books**
+- ```POST /data/books```: Create a new book (admin-only).
+- ```GET /data/books```: Get all books (accessible to all users).
+- ```GET /data/books/:id```: Get details of a book by ID.
+- ```PUT /data/books/:id```: Update a book by ID (admin-only).
+- ```DELETE /data/books/:id```: Delete a book by ID (admin-only).
+
+**c. Payments**
+- ```POST /data/payment/upload```: Upload payment image.
+
+<br>
+
+**Postman Documentation Available here**: https://documenter.getpostman.com/view/31106938/2s9YeG5Asr
 
 <br>
 
 ### 5. Entity Relationship Diagram <a name="erd"></a>
 <p align="center">
   <img src="https://imgur.com/ztaCH4G.png" height="580"/>
-</p>
-<p align="center">
-Postman Documentation Available here: https://documenter.getpostman.com/view/31106938/2s9YeG5Asr
 </p>
