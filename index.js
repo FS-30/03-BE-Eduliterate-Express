@@ -1,6 +1,6 @@
 const express = require('express');
 const app = express();
-//const cors = require('cors');
+const cors = require('cors');
 const fileUpload = require('express-fileupload');
 const PORT = process.env.PORT || 3000;
 const db = require('./config/db');
@@ -24,7 +24,7 @@ app.use(fileUpload({
 app.use(express.json());
 
 // Enable CORS for all routes
-//app.use(cors());
+app.use(cors());
 
 // Connect to MongoDB
 db.then(() => {
