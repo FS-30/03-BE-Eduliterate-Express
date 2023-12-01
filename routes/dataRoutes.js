@@ -43,7 +43,7 @@ dataRouter.get('/users', isAdmin, async (req, res) => {
 });
 
 // Update a user by ID (accessible only by admin)
-dataRouter.put('/users/:id', isAdmin, async (req, res) => {
+dataRouter.put('/users/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const { email, username, password, role, is_subscribed } = req.body;
