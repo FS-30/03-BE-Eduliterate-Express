@@ -7,6 +7,8 @@ const db = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const dataRoutes = require('./routes/dataRoutes');
 const cloudinary = require('cloudinary');
+const mongoSanitize = require("express-mongo-sanitize");
+const xss = require("xss-clean");
 
 // Cloudinary Configuration
 cloudinary.v2.config({
@@ -22,6 +24,10 @@ app.use(fileUpload({
 }));
 
 app.use(express.json());
+
+//Data Sanitize
+app.use(mongoSanitize());
+app.use(xss());
 
 // Enable CORS for all routes
 app.use(cors());
