@@ -22,16 +22,21 @@ cloudinary.v2.config({
     secure: true,
 });
 
-// CORS — allow only known origins
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173').split(',');
-app.use(cors({
-    origin: (origin, callback) => {
-        // Allow requests with no origin (e.g., mobile apps, Postman) in development
-        if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-        callback(new Error('Not allowed by CORS'));
-    },
-    credentials: true,
-}));
+// CORS — restrict to known origins when ALLOWED_ORIGINS env var is set;
+// otherwise allow all (safe default for projects without env vars configured)
+const allowedOriginsEnv = process.env.ALLOWED_ORIGINS;
+const corsOptions = allowedOriginsEnv
+    ? {
+          origin: (origin, callback) => {
+              const allowed = allowedOriginsEnv.split(',').map(o => o.trim());
+              if (!origin || allowed.includes(origin)) return callback(null, true);
+              callback(new Error('Not allowed by CORS'));
+          },
+          credentials: true,
+      }
+    : {};
+
+app.use(cors(corsOptions));
 
 // Rate limiting — global
 app.use(rateLimit({
