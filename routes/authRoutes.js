@@ -1,68 +1,82 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const Joi = require('joi');
 const User = require('../models/user');
-const authRouter = express.Router();
 
+const authRouter = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// Register endpoint
-authRouter.post('/register', async (req, res) => {
-try {
-    const { email, username, password, confirmPassword} = req.body;
-
-    if (password !== confirmPassword) {
-    return res.status(400).json({ message: 'Passwords do not match' });
-    }
-
-    // Check if the user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-    return res.status(400).json({ message: 'User already exists' });
-    }
-
-    // Hash the password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create a new user
-    const newUser = new User({
-    email,
-    username,
-    password: hashedPassword
-    });
-
-    await newUser.save();
-    res.status(201).json({ message: 'User registered successfully' });
-} catch (error) {
-    res.status(500).json({ message: 'Error registering user' });
-}
+const registerSchema = Joi.object({
+    email: Joi.string().email().max(254).required(),
+    username: Joi.string().alphanum().min(3).max(30).required(),
+    password: Joi.string().min(8).max(128).required(),
+    confirmPassword: Joi.string().valid(Joi.ref('password')).required()
+        .messages({ 'any.only': 'Passwords do not match' }),
 });
-  
 
-// Login endpoint
+const loginSchema = Joi.object({
+    email: Joi.string().email().max(254).required(),
+    password: Joi.string().max(128).required(),
+});
+
+authRouter.post('/register', async (req, res) => {
+    const { error } = registerSchema.validate(req.body, { abortEarly: false });
+    if (error) {
+        return res.status(400).json({ message: error.details.map(d => d.message).join('; ') });
+    }
+
+    try {
+        const { email, username, password } = req.body;
+
+        const existingUser = await User.findOne({ $or: [{ email }, { username }] });
+        if (existingUser) {
+            const field = existingUser.email === email ? 'email' : 'username';
+            return res.status(409).json({ message: `This ${field} is already registered` });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 12);
+        await new User({ email, username, password: hashedPassword }).save();
+
+        res.status(201).json({ message: 'Registration successful. Please log in.' });
+    } catch {
+        res.status(500).json({ message: 'Registration failed. Please try again.' });
+    }
+});
+
 authRouter.post('/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    // Check if the user exists
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+    const { error } = loginSchema.validate(req.body, { abortEarly: false });
+    if (error) {
+        return res.status(400).json({ message: error.details.map(d => d.message).join('; ') });
     }
 
-    // Compare passwords
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+    try {
+        const { email, password } = req.body;
+
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(401).json({ message: 'Invalid email or password' });
+        }
+
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            return res.status(401).json({ message: 'Invalid email or password' });
+        }
+
+        const token = jwt.sign(
+            { userId: user._id, role: user.role },
+            JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        res.status(200).json({
+            token,
+            is_subscribed: user.is_subscribed,
+            id: user._id,
+        });
+    } catch {
+        res.status(500).json({ message: 'Login failed. Please try again.' });
     }
-
-    // Create JWT token
-    const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
-
-    res.status(200).json({ token, is_subscribed: user.is_subscribed, id: user._id });
-  } catch (error) {
-    res.status(500).json({ message: 'Error logging in' });
-  }
 });
 
 module.exports = authRouter;

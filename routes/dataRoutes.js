@@ -6,7 +6,7 @@ const cloudinary = require('cloudinary');
 const User = require('../models/user');
 const Book = require('../models/book');
 const Payment = require('../models/payment');
-const { isAdmin } = require('../middlewares/authMiddleware');
+const { verifyToken, isAdmin } = require('../middlewares/authMiddleware');
 
 const dataRouter = express.Router();
 
@@ -28,7 +28,7 @@ dataRouter.post('/users', isAdmin, async (req, res) => {
         await newUser.save();
         res.status(201).json({ message: 'User created successfully', user: newUser });
     } catch (error) {
-        res.status(500).json({ message: 'Error creating user', error});
+        res.status(500).json({ message: 'Error creating user' });
     }
 });
 
@@ -37,29 +37,50 @@ dataRouter.get('/users', isAdmin, async (req, res) => {
     try {
         const users = await User.find({}, '-password');
         res.status(200).json(users);
-    } catch (error) {
-        res.status(500).json({ message: 'Error fetching users', error });
+    } catch {
+        res.status(500).json({ message: 'Error fetching users' });
     }
 });
 
-// Update a user by ID (accessible only by admin)
-dataRouter.put('/users/:id', async (req, res) => {
+// Update a user by ID
+// - Admin: can update any user's any field
+// - Authenticated user: can only update their own is_subscribed status
+dataRouter.put('/users/:id', verifyToken, async (req, res) => {
     try {
         const { id } = req.params;
-        const { email, username, password, role, is_subscribed } = req.body;
+        const requesterId = req.user.userId;
+        const requesterRole = req.user.role;
 
+        const isSelf = requesterId === id;
+        const isAdminUser = requesterRole === 'admin';
+
+        if (!isSelf && !isAdminUser) {
+            return res.status(403).json({ message: 'Forbidden: you can only update your own account' });
+        }
+
+        const { email, username, password, role, is_subscribed } = req.body;
         const updateFields = {};
-        if (email) updateFields.email = email;
-        if (username) updateFields.username = username;
-        if (password) updateFields.password = password;
-        if (role) updateFields.role = role;
+
+        if (isAdminUser) {
+            if (email) updateFields.email = email;
+            if (username) updateFields.username = username;
+            if (role) updateFields.role = role;
+        }
+
+        // Password update requires hashing
+        if (password) updateFields.password = await bcrypt.hash(password, 10);
+
+        // Only allow is_subscribed update for self (or admin)
         if (is_subscribed !== undefined) updateFields.is_subscribed = is_subscribed;
 
-        const updatedUser = await User.findByIdAndUpdate(id, updateFields, { new: true });
+        const updatedUser = await User.findByIdAndUpdate(id, updateFields, { new: true, select: '-password' });
+        if (!updatedUser) {
+            return res.status(404).json({ message: 'User not found' });
+        }
 
         res.status(200).json({ message: 'User updated successfully', user: updatedUser });
     } catch (error) {
-        res.status(500).json({ message: 'Error updating user', error });
+        res.status(500).json({ message: 'Error updating user' });
     }
 });
 
@@ -70,8 +91,8 @@ dataRouter.delete('/users/:id', isAdmin, async (req, res) => {
 
         await User.findByIdAndDelete(id);
         res.status(200).json({ message: 'User deleted successfully' });
-    } catch (error) {
-        res.status(500).json({ message: 'Error deleting user', error });
+    } catch {
+        res.status(500).json({ message: 'Error deleting user' });
     }
 });
 
@@ -102,8 +123,8 @@ dataRouter.post('/books', isAdmin, async (req, res) => {
 
         await newBook.save();
         res.status(201).json({ message: 'Book created successfully', book: newBook });
-    } catch (error) {
-        res.status(500).json({ message: 'Error creating book', error });
+    } catch {
+        res.status(500).json({ message: 'Error creating book' });
     }
 });
 
@@ -112,8 +133,8 @@ dataRouter.get('/books', async (req, res) => {
     try {
         const books = await Book.find({});
         res.status(200).json(books);
-    } catch (error) {
-        res.status(500).json({ message: 'Error fetching books', error });
+    } catch {
+        res.status(500).json({ message: 'Error fetching books' });
     }
 });
 
@@ -146,8 +167,8 @@ dataRouter.put('/books/:id', isAdmin, async (req, res) => {
         const updatedBook = await Book.findByIdAndUpdate(id, updateFields, { new: true });
 
         res.status(200).json({ message: 'Book updated successfully', book: updatedBook });
-    } catch (error) {
-        res.status(500).json({ message: 'Error updating book', error });
+    } catch {
+        res.status(500).json({ message: 'Error updating book' });
     }
 });
 
@@ -158,8 +179,8 @@ dataRouter.delete('/books/:id', isAdmin, async (req, res) => {
 
         await Book.findByIdAndDelete(id);
         res.status(200).json({ message: 'Book deleted successfully' });
-    } catch (error) {
-        res.status(500).json({ message: 'Error deleting book', error });
+    } catch {
+        res.status(500).json({ message: 'Error deleting book' });
     }
 });
 
@@ -231,13 +252,9 @@ dataRouter.post('/payment/upload', async (req, res) => {
             imageFile.tempFilePath = tempPath;
         }
 
-        console.log('Before Cloudinary upload:', imageFile);
-
         const result = await cloudinary.v2.uploader.upload(imageFile.tempFilePath, {
-            folder: 'samples'
+            folder: 'payment-proofs'
         });
-
-        console.log('After Cloudinary upload:', result);
 
         const newPayment = new Payment({
             user: userId,
