@@ -47,20 +47,13 @@ app.use(rateLimit({
     message: { message: 'Too many requests, please try again later.' },
 }));
 
-// Stricter rate limit for auth endpoints
-const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 10,
-    message: { message: 'Too many login attempts, please try again in 15 minutes.' },
-});
-
 app.use(fileUpload({ createParentPath: true, limits: { fileSize: 5 * 1024 * 1024 } }));
 app.use(express.json({ limit: '10kb' }));
 app.use(mongoSanitize());
 app.use(xss());
 
-// Routes
-app.use('/auth', authLimiter, authRoutes);
+// Routes — auth limiter is applied per-route inside authRoutes.js
+app.use('/auth', authRoutes);
 app.use('/data', dataRoutes);
 
 // 404 handler

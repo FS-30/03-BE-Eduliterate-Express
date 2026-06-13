@@ -65,13 +65,14 @@ dataRouter.put('/users/:id', verifyToken, async (req, res) => {
             if (email) updateFields.email = email;
             if (username) updateFields.username = username;
             if (role) updateFields.role = role;
+            if (is_subscribed !== undefined) updateFields.is_subscribed = is_subscribed;
+        } else if (isSelf && is_subscribed === true) {
+            // Users may activate their own subscription (one-way only — cannot self-downgrade)
+            updateFields.is_subscribed = true;
         }
 
-        // Password update requires hashing
+        // Password update requires hashing (allowed for self or admin)
         if (password) updateFields.password = await bcrypt.hash(password, 10);
-
-        // Only allow is_subscribed update for self (or admin)
-        if (is_subscribed !== undefined) updateFields.is_subscribed = is_subscribed;
 
         const updatedUser = await User.findByIdAndUpdate(id, updateFields, { new: true, select: '-password' });
         if (!updatedUser) {
@@ -262,7 +263,18 @@ dataRouter.post('/payment/upload', async (req, res) => {
         });
 
         await newPayment.save();
-        res.status(200).json({ message: 'Image uploaded successfully', imageUrl: result.secure_url });
+
+        // Activate subscription atomically after proof is recorded
+        const activatedUser = await User.findByIdAndUpdate(
+            userId,
+            { $set: { is_subscribed: true } },
+            { new: true }
+        );
+        if (!activatedUser) {
+            throw new Error('User not found — subscription could not be activated');
+        }
+
+        res.status(200).json({ message: 'Payment proof uploaded successfully', imageUrl: result.secure_url });
     } catch (error) {
         console.error('Payment processing error:', error);
         res.status(500).json({ message: 'Error processing payment', error: error.message });
