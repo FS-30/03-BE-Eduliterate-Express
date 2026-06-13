@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://imgur.com/ChAicVH.png" alt="logo sahabat lansia" width="580"/>
+  <img src="https://imgur.com/ChAicVH.png" alt="logo eduliterate" width="580"/>
 </p>
 
 # Eduliterate - Back End
